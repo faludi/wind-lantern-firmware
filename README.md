@@ -1,5 +1,5 @@
-Wind Lantern that flickers based on input via Bluetooth Low Energy from a [Modern Devices wind sensor](https://moderndevice.com/products/wind-sensor).
+# Wind Lantern firmware for automated updates.
+
+See [main Wind Lantern repo](/faludi/wind-lantern) for more info.
 
 Part of the [Natural Electronics](https://wabitronics.com) project.
-
-![wind lantern](wind_lantern.png)
