@@ -17,7 +17,7 @@ import json
 import network
 from nature_api import Client
 
-version = "1.0.44"
+version = "1.0.45"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -27,8 +27,8 @@ ssid = secrets.WIFI_SSID  # your SSID name
 password = secrets.WIFI_PASSWORD  # your WiFi password
 
 REBOOT_STATE_FILE = "reboot_state.json"
-REBOOT_BACKOFF_BASE_SECONDS = 5
-REBOOT_BACKOFF_MAX_SECONDS = 300  # cap at 5 minutes
+REBOOT_BACKOFF_BASE_SECONDS = 1
+REBOOT_BACKOFF_MAX_SECONDS = 900  # cap at 15 minutes
 
 def _load_reboot_count():
     try:
