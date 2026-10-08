@@ -498,10 +498,12 @@ def update_night_mode_state():
 def update_firmware():
     import ugit
     print("Starting safe firmware pull from GitHub...")
+    wdt.feed()
     try:
         ugit.safe_pull_all(user='faludi', repository='wind-lantern-firmware', branch=None, token=None,
                         ssid=secrets.WIFI_SSID, password=secrets.WIFI_PASSWORD, ignore=['/README.md', '/LICENSE', '/secrets.py', '/.gitignore', '/reboot_state.json'],
-                        isconnected=True, reset_after=False)
+                        isconnected=True, reset_after=True)
+        wdt.feed()
         print("Safe firmware pull completed.")
     except Exception as e:
         print("Safe firmware pull failed:", e)
@@ -585,7 +587,6 @@ async def main():
 
     next_sync = time.time()
     first_cycle_complete = False
-    update_firmware()
     while True:
         wdt.feed()
         if not nature_client.wifi_connected:
