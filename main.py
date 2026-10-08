@@ -17,7 +17,7 @@ import json
 import network
 from nature_api import Client
 
-version = "1.0.45"
+version = "1.0.46"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -495,6 +495,17 @@ def update_night_mode_state():
 
     return night_mode_current
 
+def update_firmware():
+    import ugit
+    print("Starting safe firmware pull from GitHub...")
+    try:
+        ugit.safe_pull_all(user='faludi', repository='wind-lantern-firmware', branch=None, token=None,
+                        ssid=secrets.WIFI_SSID, password=secrets.WIFI_PASSWORD, ignore=['/README.md', '/LICENSE', '/secrets.py', '/.gitignore', '/reboot_state.json'],
+                        isconnected=True, reset_after=False)
+        print("Safe firmware pull completed.")
+    except Exception as e:
+        print("Safe firmware pull failed:", e)
+
 def rand_flicker_sleep():
     time.sleep(random.randint(3, 10) / 100.0)
 
@@ -574,6 +585,7 @@ async def main():
 
     next_sync = time.time()
     first_cycle_complete = False
+    update_firmware()
     while True:
         wdt.feed()
         if not nature_client.wifi_connected:
