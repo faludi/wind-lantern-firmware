@@ -17,7 +17,7 @@ import json
 import network
 from nature_api import Client
 
-version = "1.0.48"
+version = "1.0.49"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -374,21 +374,6 @@ class WindManager:
         intensity *= self.flicker_intensity
         return random.uniform(1-(intensity/100), 1.0)
     
-# def red_light():
-#         global wind_manager
-#         brightness_level = update_night_mode_state()
-#         factor = wind_manager.get_wind_factor()
-#         red_pwm.duty(scale_brightness(100 - min(random.uniform(93-factor, 100), 100), brightness_level))
-#         red_pwm_2.duty(scale_brightness(100 - min(random.uniform(93-factor, 100) , 100), brightness_level))
-#         rand_flicker_sleep()
-
-# def green_light():
-#         global wind_manager
-#         brightness_level = update_night_mode_state()
-#         factor = wind_manager.get_wind_factor()
-#         green_pwm.duty(scale_brightness(100 - min(random.uniform(29-factor-color_temperature, 30-color_temperature) ,100), brightness_level))
-#         green_pwm_2.duty(scale_brightness(100 - min(random.uniform(29-factor-color_temperature, 30-color_temperature) ,100), brightness_level))
-#         rand_flicker_sleep()
 
 def normalize_brightness(value):
     try:
