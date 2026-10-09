@@ -17,7 +17,7 @@ import json
 import network
 from nature_api import Client
 
-version = "1.0.46"
+version = "1.0.48"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -149,7 +149,7 @@ def get_lantern_mac():
     return ''.join('{:02X}'.format(value) for value in mac_bytes)
 
 def get_settings_url():
-    return settings_endpoint + '?mac=' + get_lantern_mac()
+    return settings_endpoint + '?mac=' + get_lantern_mac() + '&version=' + version
 
 def parse_datetime(timestamp):
     # Split the timestamp into date and time
@@ -283,6 +283,8 @@ async def update_settings():
             except Exception as e:
                 print('Error setting location:', e)
         save_config()
+        if settings.get('update_firmware') is True:
+            update_firmware()
     else:
         print("Using default settings")
 
