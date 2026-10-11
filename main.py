@@ -16,6 +16,13 @@ import gc
 import json
 import network
 from nature_api import Client
+from lantern_config import (
+    DEFAULT_SETTINGS,
+    normalize_brightness,
+    normalize_settings,
+    serialize_settings,
+    settings_match,
+)
 
 version = "1.0.49"
 print("Wind Lantern NatureAPI - Version:", version)
@@ -57,18 +64,18 @@ def apply_reboot_backoff():
 def clear_reboot_backoff():
     _save_reboot_count(0)
 
-address = "350 5th Avenue, New York, NY"
-latitude = 40.7484773
-longitude = -73.9881643
-settings_endpoint = "https://shinyshape.com/windlantern/lantern_checkin.php"
-settings_update_interval = 15  # minutes
+address = DEFAULT_SETTINGS["address"]
+latitude = DEFAULT_SETTINGS["latitude"]
+longitude = DEFAULT_SETTINGS["longitude"]
+settings_endpoint = DEFAULT_SETTINGS["settings_endpoint"]
+settings_update_interval = DEFAULT_SETTINGS["settings_update_interval"]  # minutes
 lantern_mac = None
-day_brightness = 100
-night_brightness = 20
-night_start_localtime = 22
-night_end_localtime = 8
-color_temperature = 0
-flicker_intensity = 1.0
+day_brightness = DEFAULT_SETTINGS["lantern_brightness"]
+night_brightness = DEFAULT_SETTINGS["night_brightness"]
+night_start_localtime = DEFAULT_SETTINGS["night_start"]
+night_end_localtime = DEFAULT_SETTINGS["night_end"]
+color_temperature = DEFAULT_SETTINGS["color_temperature"]
+flicker_intensity = DEFAULT_SETTINGS["flicker_intensity"]
 night_mode_current = 100
 night_mode_target = 100
 night_mode_fade_from = 100
@@ -185,46 +192,65 @@ def open_config():
         with open('config.json', 'r') as f:
             config_str = f.read()
             config = json.loads(config_str)
-            # print(config)
-            return config
+            return normalize_settings(config, DEFAULT_SETTINGS)
     except OSError:
         print("Creating configuration file.")
         try:
             with open("config.json", "w") as f:
-                config = {"address": "350 5th Avenue, New York, NY", "latitude": 40.7484773, "longitude": -73.9881643, "settings_endpoint": "https://shinyshape.com/windlantern/lantern_checkin.php", "settings_update_interval": 15, "lantern_brightness": 100, "night_brightness": 20, "night_start": 22, "night_end": 8, "color_temperature": 0, "flicker_intensity": 1.0}
-                json_string = json.dumps(config)
-                # print(config)
-                f.write(json_string)
-                return config
+                f.write(serialize_settings(DEFAULT_SETTINGS))
+                return DEFAULT_SETTINGS.copy()
         except Exception as e:
             print("Error storing light levels:", e)
 
+def get_current_settings():
+    return {
+        "address": address,
+        "latitude": latitude,
+        "longitude": longitude,
+        "settings_endpoint": settings_endpoint,
+        "settings_update_interval": settings_update_interval,
+        "lantern_brightness": day_brightness,
+        "night_brightness": night_brightness,
+        "night_start": night_start_localtime,
+        "night_end": night_end_localtime,
+        "color_temperature": color_temperature,
+        "flicker_intensity": flicker_intensity,
+    }
+
+def apply_settings(values, fallback=None):
+    global address, latitude, longitude, settings_endpoint, settings_update_interval
+    global day_brightness, night_brightness, night_start_localtime, night_end_localtime
+    global color_temperature, flicker_intensity
+
+    if fallback is None:
+        fallback = get_current_settings()
+    settings = normalize_settings(values, fallback)
+    address = settings["address"]
+    latitude = settings["latitude"]
+    longitude = settings["longitude"]
+    settings_endpoint = settings["settings_endpoint"]
+    settings_update_interval = settings["settings_update_interval"]
+    day_brightness = settings["lantern_brightness"]
+    night_brightness = settings["night_brightness"]
+    night_start_localtime = settings["night_start"]
+    night_end_localtime = settings["night_end"]
+    color_temperature = settings["color_temperature"]
+    flicker_intensity = settings["flicker_intensity"]
+    wind_manager.flicker_intensity = flicker_intensity
+
 def save_config():
+    settings = get_current_settings()
     try:
         with open("config.json", "r") as f:
-            config_str = f.read()
-            config = json.loads(config_str)
-            if (config.get('address') == address and
-                config.get('latitude') == latitude and
-                config.get('longitude') == longitude and
-                config.get('settings_endpoint') == settings_endpoint and
-                config.get('settings_update_interval') == settings_update_interval and
-                config.get('lantern_brightness') == day_brightness and
-                config.get('night_brightness') == night_brightness and
-                config.get('night_start') == night_start_localtime and
-                config.get('night_end') == night_end_localtime and
-                config.get('color_temperature') == color_temperature and
-                config.get('flicker_intensity') == flicker_intensity):
+            config = json.loads(f.read())
+            if settings_match(config, settings):
                 print("Configuration unchanged, not saving.")
                 return
     except Exception as e:
         print("Error reading config for comparison:", e)
     try:
         with open("config.json", "w") as f:
-            config = {"address": address, "latitude": latitude, "longitude": longitude, "settings_endpoint": settings_endpoint, "settings_update_interval": settings_update_interval, "lantern_brightness": day_brightness, "night_brightness": night_brightness, "night_start": night_start_localtime, "night_end": night_end_localtime, "color_temperature": color_temperature, "flicker_intensity": flicker_intensity}
-            json_string = json.dumps(config)
-            # print(config)
-            f.write(json_string)
+            f.write(serialize_settings(settings))
             print("Configuration saved.")
     except Exception as e:
         print("Error saving config:", e)
@@ -249,24 +275,14 @@ def fetch_address(url):
 
     
 async def update_settings():
-    global address, latitude, longitude, settings_endpoint
-    global settings_update_interval
-    global day_brightness, night_brightness, night_start_localtime, night_end_localtime, color_temperature, flicker_intensity
+    global latitude, longitude
     settings = fetch_address(get_settings_url())
     if settings is not None:
-        address = settings.get('address', address)
+        remote_settings = settings.copy()
+        remote_settings.pop("latitude", None)
+        remote_settings.pop("longitude", None)
+        apply_settings(remote_settings)
         print("Using Address:", address)
-        settings_endpoint = settings.get('settings_endpoint', settings_endpoint)
-        settings_update_interval = normalize_settings_update_interval(
-            settings.get('settings_update_interval', settings_update_interval)
-        )
-        day_brightness = normalize_brightness(settings.get('lantern_brightness', day_brightness))
-        night_brightness = normalize_night_brightness(settings.get('night_brightness', night_brightness))
-        night_start_localtime = normalize_night_hour(settings.get('night_start', night_start_localtime))
-        night_end_localtime = normalize_night_hour(settings.get('night_end', night_end_localtime))
-        color_temperature = normalize_color_temperature(settings.get('color_temperature', color_temperature))
-        flicker_intensity = normalize_flicker_intensity(settings.get('flicker_intensity', flicker_intensity))
-        wind_manager.flicker_intensity = flicker_intensity
         if address:
             try:
                 nature_client.set_location(address)
@@ -375,55 +391,11 @@ class WindManager:
         return random.uniform(1-(intensity/100), 1.0)
     
 
-def normalize_brightness(value):
-    try:
-        return min(max(float(value), 0), 100)
-    except (TypeError, ValueError):
-        return 100
-
 def scale_brightness(duty, brightness_override=None):
     if brightness_override is None:
         brightness_override = day_brightness
     brightness_level = normalize_brightness(brightness_override)
     return 100 - ((100 - duty) * brightness_level / 100)
-
-def normalize_color_temperature(value):
-    try:
-        return min(max(float(value), -10), 10)
-    except (TypeError, ValueError):
-        return 0
-
-def normalize_flicker_intensity(value):
-    try:
-        return min(max(float(value), 0), 5)
-    except (TypeError, ValueError):
-        return 1
-
-def normalize_settings_update_interval(value):
-    try:
-        interval = int(value)
-        if float(value) != interval:
-            return 15
-        return min(max(interval, 1), 10080)
-    except (TypeError, ValueError):
-        return 15
-
-def normalize_night_brightness(value):
-    try:
-        return min(max(float(value), 0), 100)
-    except (TypeError, ValueError):
-        return 10
-
-def normalize_night_hour(value):
-    try:
-        hour = int(value)
-    except (TypeError, ValueError):
-        return 0
-    if hour < 0:
-        return 0
-    if hour > 23:
-        return 23
-    return hour
 
 def get_local_timezone_offset_hours():
     global cached_timezone_offset_hours, timezone_offset_next_refresh
@@ -520,32 +492,7 @@ async def main():
     global address, latitude, longitude, settings_endpoint, settings_update_interval, lantern_mac, day_brightness, night_brightness, night_start_localtime, night_end_localtime, color_temperature, flicker_intensity, night_mode_current, night_mode_target, night_mode_fade_from, night_mode_fade_to, night_mode_fade_start, initial_time_sync_complete
     settings = open_config()
     if settings is not None:
-        address = settings.get('address', address)
-        latitude = settings.get('latitude', latitude)
-        longitude = settings.get('longitude', longitude)
-        settings_endpoint = settings.get('settings_endpoint', settings_endpoint)
-        settings_update_interval = normalize_settings_update_interval(
-            settings.get('settings_update_interval', settings_update_interval)
-        )
-        day_brightness = normalize_brightness(
-            settings.get('lantern_brightness', day_brightness)
-        )
-        night_brightness = normalize_night_brightness(
-            settings.get('night_brightness', night_brightness)
-        )
-        night_start_localtime = normalize_night_hour(
-            settings.get('night_start', night_start_localtime)
-        )
-        night_end_localtime = normalize_night_hour(
-            settings.get('night_end', night_end_localtime)
-        )
-        color_temperature = normalize_color_temperature(
-            settings.get('color_temperature', color_temperature)
-        )
-        flicker_intensity = normalize_flicker_intensity(
-            settings.get('flicker_intensity', flicker_intensity)
-        )
-        wind_manager.flicker_intensity = flicker_intensity
+        apply_settings(settings, DEFAULT_SETTINGS)
 
     night_mode_current = day_brightness
     night_mode_target = day_brightness
