@@ -25,7 +25,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.52"
+version = "1.0.53"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -175,6 +175,7 @@ def connect_to_wifi():
 def get_lantern_mac():
     """Return the station MAC address as an uppercase hex string."""
     wlan = network.WLAN(network.STA_IF)
+    wlan.active(True)
     mac_bytes = wlan.config('mac')
     return ''.join('{:02X}'.format(value) for value in mac_bytes)
 
