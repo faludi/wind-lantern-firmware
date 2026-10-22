@@ -26,4 +26,20 @@ class url_encode:
         return url
 
 
+def form_decode(value):
+    """Decode an application/x-www-form-urlencoded value ('+' and UTF-8 percent escapes)."""
+    value = value.replace("+", " ")
+    out = bytearray()
+    i = 0
+    n = len(value)
+    while i < n:
+        if value[i] == "%":
+            out.append(int(value[i + 1:i + 3], 16))
+            i += 3
+        else:
+            out.extend(value[i].encode())
+            i += 1
+    return out.decode()
+
+
  
