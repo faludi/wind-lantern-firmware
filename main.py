@@ -25,7 +25,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.53"
+version = "1.0.54"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -138,11 +138,6 @@ blue_pwm_2 = Pulse(Pin(blue_pin_2))
 blue_pwm_2.freq(300)
 blue_pwm_2.duty(100)
 
-red_pwm.duty(3)
-green_pwm.duty(70)
-red_pwm_2.duty(3)
-green_pwm_2.duty(70)
-
 def setup_button_pressed():
     """Return True if the setup button is held low (debounced)."""
     button = Pin(SETUP_BUTTON_PIN, Pin.IN, Pin.PULL_UP)
@@ -154,6 +149,10 @@ def setup_button_pressed():
 setup_requested = setup_button_pressed()
 
 if not setup_requested:  # a deliberate setup request should not wait out a reboot backoff
+    red_pwm.duty(3)
+    green_pwm.duty(70)
+    red_pwm_2.duty(3)
+    green_pwm_2.duty(70)
     apply_reboot_backoff()
 
 wdt = WDT(timeout=8388)  # 8-second watchdog timer
@@ -674,7 +673,7 @@ async def main():
             # Made it through one full cycle without a watchdog/crash reboot; stop backing off.
             clear_reboot_backoff()
             first_cycle_complete = True
-        await wait_with_watchdog(settings_update_interval *60 * 1000)
+        await wait_with_watchdog(settings_update_interval * 60 * 1000)
 
 # Create an Event Loop
 loop = asyncio.get_event_loop()
