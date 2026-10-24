@@ -8,7 +8,7 @@ from Url_encode import url_encode, form_decode
 import machine
 import ntptime
 
-__version__ = "0.1.15"
+__version__ = "0.1.16"
 
 class WifiProvisioningError(Exception):
     """Base class for Wi-Fi provisioning failures."""
@@ -31,7 +31,10 @@ _PORTAL_PAGE = (
     '<p><label>Password (8-63 characters, leave blank for an open network)<br>'
     '<input name="password" id="pw" type="password" maxlength="63" style="width:100%"></label>'
     '<label><input type="checkbox" onclick="document.getElementById(\'pw\').type=this.checked?\'text\':\'password\'"> Show password</label></p>'
-    '<button type="submit">Connect</button></form></body></html>'
+    '<button type="submit">Connect</button></form>'
+    '<footer style="margin-top:1.5em;color:#666;font-size:0.75em;line-height:1.5">'
+    'Device MAC: {device_mac}<br>Firmware version: {firmware_version}<br>'
+    'NatureAPI version: {nature_api_version}</footer></body></html>'
 )
 
 _MESSAGE_PAGE = (
@@ -88,7 +91,7 @@ class Client:
             },
         }
 
-    def connect_wifi(self, attempts_per_cycle=10, max_cycles=10, provision_on_failure=False):
+    def connect_wifi(self, attempts_per_cycle=10, max_cycles=10, provision_on_failure=False, firmware_version=None):
         """Connect to the configured Wi-Fi network, retrying until successful.
 
         If provision_on_failure is True, a failed connection starts provision_wifi() instead of
@@ -118,16 +121,17 @@ class Client:
                 print('IP address:', network_info[0])
                 return True
         if provision_on_failure:
-            self.provision_wifi()
+            self.provision_wifi(firmware_version=firmware_version)
             return True
         print('Exceeded maximum connection attempts, resetting device...')
         machine.reset()
 
-    def provision_wifi(self, ap_ssid="NatureAPI-Setup", ap_password=None, timeout=300, max_attempts=1, on_status=None):
+    def provision_wifi(self, ap_ssid="NatureAPI-Setup", ap_password=None, timeout=300, max_attempts=1, on_status=None, firmware_version=None):
         """Start an access point with a Wi-Fi setup page and return (ssid, password) once verified.
 
         Raises WifiConnectError after max_attempts failed connections, or WifiProvisioningTimeout
         after timeout seconds. on_status(state) receives: ap_started, connecting, failed, success, timeout.
+        firmware_version is an optional version string displayed on the setup page.
         """
         if ap_password is not None and not 8 <= len(ap_password) <= 63:
             raise ValueError("ap_password must be 8-63 characters")
@@ -161,6 +165,11 @@ class Client:
             while not ap.active():
                 feed()
                 time.sleep_ms(100)
+            try:
+                device_mac = ":".join("%02x" % byte for byte in ap.config("mac"))
+            except Exception:
+                device_mac = "Unavailable"
+            display_firmware_version = firmware_version if firmware_version is not None else "Not provided"
 
             http = socket.socket()
             http.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -188,7 +197,8 @@ class Client:
                     method, path, form = request
                     if not (method == "POST" and path == "/save"):
                         if method == "GET" and path == "/":
-                            self._send_http(conn, "200 OK", self._portal_form(ssids, error, ssid_hint))
+                            self._send_http(conn, "200 OK", self._portal_form(
+                                ssids, error, ssid_hint, device_mac, display_firmware_version))
                         else:
                             self._send_http(conn, "302 Found", "", "Location: http://192.168.4.1/\r\n")
                         continue
@@ -203,7 +213,8 @@ class Client:
                         error = ""
                     ssid_hint = new_ssid
                     if error:
-                        self._send_http(conn, "200 OK", self._portal_form(ssids, error, ssid_hint))
+                        self._send_http(conn, "200 OK", self._portal_form(
+                            ssids, error, ssid_hint, device_mac, display_firmware_version))
                         continue
 
                     notify("connecting")
@@ -226,7 +237,8 @@ class Client:
                             title="Connection failed", text="Could not join the network. Setup has ended."))
                         raise WifiConnectError("Could not connect to the submitted Wi-Fi network")
                     error = "Could not connect. Check the name and password and try again."
-                    self._send_http(conn, "200 OK", self._portal_form(ssids, error, ssid_hint))
+                    self._send_http(conn, "200 OK", self._portal_form(
+                        ssids, error, ssid_hint, device_mac, display_firmware_version))
                 except (OSError, ValueError):
                     continue
                 finally:
@@ -319,10 +331,17 @@ class Client:
             status, len(payload), extra_headers)
         conn.sendall(header.encode() + payload)
 
-    def _portal_form(self, ssids, error, ssid_hint):
+    def _portal_form(self, ssids, error, ssid_hint, device_mac, firmware_version):
         opts = "".join('<option value="%s">' % _html_escape(s) for s in ssids)
         msg = '<p style="color:#b00"><b>%s</b></p>' % _html_escape(error) if error else ""
-        return _PORTAL_PAGE.format(msg=msg, ssid=_html_escape(ssid_hint), opts=opts)
+        return _PORTAL_PAGE.format(
+            msg=msg,
+            ssid=_html_escape(ssid_hint),
+            opts=opts,
+            device_mac=_html_escape(device_mac),
+            firmware_version=_html_escape(str(firmware_version)),
+            nature_api_version=_html_escape(__version__),
+        )
 
     def _serve_dns(self, sock):
         """Answer any pending DNS query with the AP address so clients show the setup page."""

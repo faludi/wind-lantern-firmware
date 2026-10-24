@@ -1,4 +1,4 @@
-# Rob Faludi 2025
+# Rob Faludi 2025-26
 # WiFi based on code from Rui Santos & Sara Santos
 # https://randomnerdtutorials.com/raspberry-pi-pico-w-wi-fi-micropython/
 # Flicker based on code from Grant Whitney
@@ -233,6 +233,7 @@ def run_wifi_setup():
             timeout=SETUP_AP_TIMEOUT_SECONDS,
             max_attempts=SETUP_AP_MAX_ATTEMPTS,
             on_status=setup_status_led,
+            firmware_version=version,
         )
         save_wifi_credentials(new_ssid, new_password)
         print("Wi-Fi credentials saved for:", new_ssid, "- rebooting")
