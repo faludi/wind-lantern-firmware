@@ -25,7 +25,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.54"
+version = "1.0.55"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -233,6 +233,11 @@ def run_wifi_setup():
             max_attempts=SETUP_AP_MAX_ATTEMPTS,
             on_status=setup_status_led,
             firmware_version=version,
+            instructions=(
+                "1. Enter your Wi-Fi network name and password, then select Connect. Leave the password blank only for an open network. The lights will turn yellow to indicate connecting.\n"
+                "2. If the connection is unsuccessful the lights will turn red. Check the network name and password, then try again.\n"
+                "3. On success, the lights will turn green, then the lantern will restart and connect to your Wi-Fi automatically."
+            ),
         )
         save_wifi_credentials(new_ssid, new_password)
         print("Wi-Fi credentials saved for:", new_ssid, "- rebooting")

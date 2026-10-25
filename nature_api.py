@@ -19,11 +19,17 @@ class WifiConnectError(WifiProvisioningError):
 class WifiProvisioningTimeout(WifiProvisioningError):
     """No valid credentials were submitted before the provisioning timeout."""
 
+_DEFAULT_PORTAL_INSTRUCTIONS = (
+    "1. Enter your Wi-Fi network name and password, then select Connect. Leave the password blank only for an open network.\n"
+    "2. If the connection is unsuccessful, check the network name and password, then try again.\n"
+    "3. On success, the lantern will restart and connect to your Wi-Fi automatically."
+)
+
 _PORTAL_PAGE = (
     '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
     '<title>Device Wi-Fi Setup</title></head>'
     '<body style="font-family:sans-serif;max-width:24em;margin:1em auto;padding:0 1em">'
-    '<h2>Wi-Fi Setup</h2>{msg}'
+    '<h2>Wi-Fi Setup</h2>{msg}<div style="white-space:pre-wrap;line-height:1.5">{instructions}</div>'
     '<form method="POST" action="/save">'
     '<p><label>Network name (SSID)<br>'
     '<input name="ssid" list="n" maxlength="32" required value="{ssid}" style="width:100%"></label>'
@@ -91,7 +97,8 @@ class Client:
             },
         }
 
-    def connect_wifi(self, attempts_per_cycle=10, max_cycles=10, provision_on_failure=False, firmware_version=None):
+    def connect_wifi(self, attempts_per_cycle=10, max_cycles=10, provision_on_failure=False, firmware_version=None,
+                     instructions=_DEFAULT_PORTAL_INSTRUCTIONS):
         """Connect to the configured Wi-Fi network, retrying until successful.
 
         If provision_on_failure is True, a failed connection starts provision_wifi() instead of
@@ -121,12 +128,13 @@ class Client:
                 print('IP address:', network_info[0])
                 return True
         if provision_on_failure:
-            self.provision_wifi(firmware_version=firmware_version)
+            self.provision_wifi(firmware_version=firmware_version, instructions=instructions)
             return True
         print('Exceeded maximum connection attempts, resetting device...')
         machine.reset()
 
-    def provision_wifi(self, ap_ssid="NatureAPI-Setup", ap_password=None, timeout=300, max_attempts=1, on_status=None, firmware_version=None):
+    def provision_wifi(self, ap_ssid="NatureAPI-Setup", ap_password=None, timeout=300, max_attempts=1, on_status=None,
+                       firmware_version=None, instructions=_DEFAULT_PORTAL_INSTRUCTIONS):
         """Start an access point with a Wi-Fi setup page and return (ssid, password) once verified.
 
         Raises WifiConnectError after max_attempts failed connections, or WifiProvisioningTimeout
@@ -198,7 +206,7 @@ class Client:
                     if not (method == "POST" and path == "/save"):
                         if method == "GET" and path == "/":
                             self._send_http(conn, "200 OK", self._portal_form(
-                                ssids, error, ssid_hint, device_mac, display_firmware_version))
+                                ssids, error, ssid_hint, device_mac, display_firmware_version, instructions))
                         else:
                             self._send_http(conn, "302 Found", "", "Location: http://192.168.4.1/\r\n")
                         continue
@@ -214,7 +222,7 @@ class Client:
                     ssid_hint = new_ssid
                     if error:
                         self._send_http(conn, "200 OK", self._portal_form(
-                            ssids, error, ssid_hint, device_mac, display_firmware_version))
+                            ssids, error, ssid_hint, device_mac, display_firmware_version, instructions))
                         continue
 
                     notify("connecting")
@@ -238,7 +246,7 @@ class Client:
                         raise WifiConnectError("Could not connect to the submitted Wi-Fi network")
                     error = "Could not connect. Check the name and password and try again."
                     self._send_http(conn, "200 OK", self._portal_form(
-                        ssids, error, ssid_hint, device_mac, display_firmware_version))
+                        ssids, error, ssid_hint, device_mac, display_firmware_version, instructions))
                 except (OSError, ValueError):
                     continue
                 finally:
@@ -331,11 +339,13 @@ class Client:
             status, len(payload), extra_headers)
         conn.sendall(header.encode() + payload)
 
-    def _portal_form(self, ssids, error, ssid_hint, device_mac, firmware_version):
+    def _portal_form(self, ssids, error, ssid_hint, device_mac, firmware_version,
+                     instructions=_DEFAULT_PORTAL_INSTRUCTIONS):
         opts = "".join('<option value="%s">' % _html_escape(s) for s in ssids)
         msg = '<p style="color:#b00"><b>%s</b></p>' % _html_escape(error) if error else ""
         return _PORTAL_PAGE.format(
             msg=msg,
+            instructions=_html_escape(instructions),
             ssid=_html_escape(ssid_hint),
             opts=opts,
             device_mac=_html_escape(device_mac),
