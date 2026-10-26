@@ -25,7 +25,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.55.2"
+version = "1.0.56"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -581,7 +581,7 @@ def update_firmware():
     def feed_during_update(_t):
         if time.ticks_diff(deadline, time.ticks_ms()) > 0:
             wdt.feed()
-    feeder = Timer(1)
+    feeder = Timer(-1)  # RP2040 only supports the virtual timer id -1
     feeder.init(period=1000, mode=Timer.PERIODIC, callback=feed_during_update)
     try:
         ugit.safe_pull_all(user='faludi', repository='wind-lantern-firmware', branch=None, token=None,
