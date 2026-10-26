@@ -16,6 +16,7 @@ import gc
 import json
 import os
 import network
+import ugit
 from nature_api import Client
 from lantern_config import (
     DEFAULT_SETTINGS,
@@ -25,7 +26,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.56"
+version = "1.0.57"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -572,10 +573,10 @@ def update_night_mode_state():
 
 def update_firmware():
     """Pull the latest firmware from GitHub via ugit and reset on success."""
-    import ugit
     from machine import Timer
     print("Starting safe firmware pull from GitHub...")
     wdt.feed()
+    gc.collect()
     # ugit blocks for long stretches; feed from a timer, but stop after 5 minutes so a hung update still resets.
     deadline = time.ticks_add(time.ticks_ms(), 300000)
     def feed_during_update(_t):
@@ -584,6 +585,7 @@ def update_firmware():
     feeder = Timer(-1)  # RP2040 only supports the virtual timer id -1
     feeder.init(period=1000, mode=Timer.PERIODIC, callback=feed_during_update)
     try:
+        gc.collect()
         ugit.safe_pull_all(user='faludi', repository='wind-lantern-firmware', branch=None, token=None,
                         ssid=nature_client.ssid, password=nature_client.password, ignore=['/README.md', '/LICENSE', '/secrets.py', '/.gitignore', '/reboot_state.json'],
                         isconnected=True, reset_after=True)
