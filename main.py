@@ -573,8 +573,16 @@ def update_night_mode_state():
 def update_firmware():
     """Pull the latest firmware from GitHub via ugit and reset on success."""
     import ugit
+    from machine import Timer
     print("Starting safe firmware pull from GitHub...")
     wdt.feed()
+    # ugit blocks for long stretches; feed from a timer, but stop after 5 minutes so a hung update still resets.
+    deadline = time.ticks_add(time.ticks_ms(), 300000)
+    def feed_during_update(_t):
+        if time.ticks_diff(deadline, time.ticks_ms()) > 0:
+            wdt.feed()
+    feeder = Timer(1)
+    feeder.init(period=1000, mode=Timer.PERIODIC, callback=feed_during_update)
     try:
         ugit.safe_pull_all(user='faludi', repository='wind-lantern-firmware', branch=None, token=None,
                         ssid=nature_client.ssid, password=nature_client.password, ignore=['/README.md', '/LICENSE', '/secrets.py', '/.gitignore', '/reboot_state.json'],
@@ -583,6 +591,8 @@ def update_firmware():
         print("Safe firmware pull completed.")
     except Exception as e:
         print("Safe firmware pull failed:", e)
+    finally:
+        feeder.deinit()
 
 def rand_flicker_sleep():
     """Sleep a random 30-100 ms between flicker updates."""
