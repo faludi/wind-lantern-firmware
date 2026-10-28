@@ -26,7 +26,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.57.10"
+version = "1.0.58"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -577,8 +577,8 @@ def update_firmware():
     print("Starting safe firmware pull from GitHub...")
     wdt.feed()
     gc.collect()
-    # ugit blocks for long stretches; feed from a timer, but stop after 5 minutes so a hung update still resets.
-    deadline = time.ticks_add(time.ticks_ms(), 300000)
+    # ugit blocks for long stretches; feed from a timer, but stop after 3 minutes so a hung update still resets.
+    deadline = time.ticks_add(time.ticks_ms(), 180000)
     def feed_during_update(_t):
         if time.ticks_diff(deadline, time.ticks_ms()) > 0:
             wdt.feed()
