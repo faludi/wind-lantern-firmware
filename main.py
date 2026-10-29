@@ -26,7 +26,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.58"
+version = "1.0.60"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -93,6 +93,8 @@ timezone_offset_next_refresh = 0
 night_mode_next_update = 0
 TIMEZONE_OFFSET_REFRESH_MS = 3600000  # re-check timezone offset hourly
 NIGHT_MODE_UPDATE_INTERVAL_MS = 1000  # recompute night mode at most once per second
+PERIODIC_UPDATE_INTERVAL_MS = 15 * 60 * 1000  # check Wi-Fi and update weather every 15 minutes
+TIME_SYNC_INTERVAL_MS = 12 * 60 * 60 * 1000
 
 red_pin = 5
 green_pin = 6
@@ -619,7 +621,7 @@ def light_candle():
 wind_manager = WindManager(flicker_intensity)
 
 async def main():
-    """Load config, connect Wi-Fi, sync time, then periodically refresh settings, NTP, and wind data."""
+    """Load config, connect Wi-Fi, sync time, then periodically refresh settings and wind data."""
     wdt.feed()
     global address, latitude, longitude, settings_endpoint, settings_update_interval, lantern_mac, day_brightness, night_brightness, night_start_localtime, night_end_localtime, color_temperature, flicker_intensity, night_mode_current, night_mode_target, night_mode_fade_from, night_mode_fade_to, night_mode_fade_start, initial_time_sync_complete
     settings = open_config()
@@ -647,50 +649,74 @@ async def main():
         except Exception as e:
             print('Warning: initial location setup failed:', e)
 
-    if not nature_client.sync_time():
+    initial_time_sync_succeeded = nature_client.sync_time()
+    if not initial_time_sync_succeeded:
         print('NTP sync failed, continuing with local time if available.')
     initial_time_sync_complete = True
 
-    next_sync = time.time()
+    next_periodic_update = time.ticks_ms()
+    next_settings_update = next_periodic_update
+    next_time_sync = time.ticks_add(
+        next_periodic_update,
+        TIME_SYNC_INTERVAL_MS if initial_time_sync_succeeded else PERIODIC_UPDATE_INTERVAL_MS,
+    )
     first_cycle_complete = False
     while True:
         wdt.feed()
-        if not nature_client.wifi_connected:
-            break # exit if no connection
-        await update_settings()
-        if (time.time() >= next_sync):
+        now = time.ticks_ms()
+        if time.ticks_diff(now, next_settings_update) >= 0:
+            await update_settings()
+            next_settings_update = time.ticks_add(
+                time.ticks_ms(), settings_update_interval * 60 * 1000
+            )
+
+        if time.ticks_diff(time.ticks_ms(), next_periodic_update) >= 0:
+            if not nature_client.wifi_connected:
+                break  # exit if no connection
+            if time.ticks_diff(time.ticks_ms(), next_time_sync) >= 0:
+                try:
+                    print('Syncing time via NTP...')
+                    wdt.feed()
+                    if nature_client.sync_time():
+                        print(f"DateTime: {time.gmtime()[0]}-{time.gmtime()[1]:02}-{time.gmtime()[2]:02} {time.gmtime()[3]:02}:{time.gmtime()[4]:02}:{time.gmtime()[5]:02} UTC  ")
+                        next_time_sync = time.ticks_add(
+                            time.ticks_ms(), TIME_SYNC_INTERVAL_MS
+                        )
+                    else:
+                        print("NTP sync failed; retrying in 15 minutes.")
+                except Exception as e:
+                    print("Failed to update NTP; retrying in 15 minutes.", e)
             try:
-                print('Syncing time via NTP...')
-                wdt.feed()
-                nature_client.sync_time()
-                print(f"DateTime: {time.gmtime()[0]}-{time.gmtime()[1]:02}-{time.gmtime()[2]:02} {time.gmtime()[3]:02}:{time.gmtime()[4]:02}:{time.gmtime()[5]:02} UTC  ")
-                next_sync = time.time() + 43200 # update every 12 hours
+                # Fetch and display weather data using nature_api
+                weather = fetch_weather_data()
+                if weather is not None:
+                    # print('Weather Data:', weather)
+                    wind_speed = weather['current']['wind_speed_10m']*0.27778
+                    wind_gusts = weather['current']['wind_gusts_10m']*0.27778
+                    timestamp = weather['current']['time']
+                    wind_manager.set_wind(wind_speed, wind_gusts)
+                    print('Timestamp:', parse_datetime(timestamp))
+                    print(f"Speed: {weather['current']['wind_speed_10m']} kph, Gusts: {weather['current']['wind_gusts_10m']} kph")
+                    print(f"Speed: {wind_speed * 2.23693629:.2f} mph, Gusts: {wind_gusts * 2.23693629:.2f} mph")
+                    print(f"Speed {wind_speed:.2f} m/s, Gusts {wind_gusts:.2f} m/s")
+                    print("Wind factor:", wind_manager.wind_factor, "Gust factor:", wind_manager.gust_factor)
+                else:
+                    print('No weather data available')
             except Exception as e:
-                next_sync = time.time() + 600 # try again in 10 minutes
-                print("Failed to update NTP or solar data, retrying in 10 minutes.", e)
-        try:
-            # Fetch and display weather data using nature_api
-            weather = fetch_weather_data()
-            if weather is not None:
-                # print('Weather Data:', weather)
-                wind_speed = weather['current']['wind_speed_10m']*0.27778
-                wind_gusts = weather['current']['wind_gusts_10m']*0.27778
-                timestamp = weather['current']['time']
-                wind_manager.set_wind(wind_speed, wind_gusts)
-                print('Timestamp:', parse_datetime(timestamp))
-                print(f"Speed: {weather['current']['wind_speed_10m']} kph, Gusts: {weather['current']['wind_gusts_10m']} kph")
-                print(f"Speed: {wind_speed * 2.23693629:.2f} mph, Gusts: {wind_gusts * 2.23693629:.2f} mph") 
-                print(f"Speed {wind_speed:.2f} m/s, Gusts {wind_gusts:.2f} m/s")
-                print("Wind factor:", wind_manager.wind_factor, "Gust factor:", wind_manager.gust_factor)
-            else:
-                print('No weather data available')
-        except Exception as e:
-            print('Error fetching weather data:', e)
+                print('Error fetching weather data:', e)
+            next_periodic_update = time.ticks_add(
+                time.ticks_ms(), PERIODIC_UPDATE_INTERVAL_MS
+            )
+
         if not first_cycle_complete:
             # Made it through one full cycle without a watchdog/crash reboot; stop backing off.
             clear_reboot_backoff()
             first_cycle_complete = True
-        await wait_with_watchdog(settings_update_interval * 60 * 1000)
+
+        now = time.ticks_ms()
+        settings_wait = max(time.ticks_diff(next_settings_update, now), 0)
+        periodic_wait = max(time.ticks_diff(next_periodic_update, now), 0)
+        await wait_with_watchdog(min(settings_wait, periodic_wait))
 
 # Create an Event Loop
 loop = asyncio.get_event_loop()
