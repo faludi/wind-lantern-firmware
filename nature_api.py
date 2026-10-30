@@ -8,7 +8,7 @@ from Url_encode import url_encode, form_decode
 import machine
 import ntptime
 
-__version__ = "0.1.16"
+__version__ = "0.1.17"
 
 class WifiProvisioningError(Exception):
     """Base class for Wi-Fi provisioning failures."""
@@ -27,16 +27,29 @@ _DEFAULT_PORTAL_INSTRUCTIONS = (
 
 _PORTAL_PAGE = (
     '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
-    '<title>Device Wi-Fi Setup</title></head>'
-    '<body style="font-family:sans-serif;max-width:24em;margin:1em auto;padding:0 1em">'
+    '<title>Device Wi-Fi Setup</title>'
+    '<style>'
+    'body{{font-family:-apple-system,sans-serif;max-width:24em;margin:1em auto;padding:0 1em;color:#111}}'
+    'label{{display:block;font-weight:600;margin:1.2em 0 .4em}}'
+    'input[type=text],input[type=password]{{box-sizing:border-box;width:100%;font-size:18px;padding:12px;'
+    'border:2px solid #555;border-radius:8px;background:#fff;color:#000;-webkit-appearance:none;appearance:none}}'
+    'input[type=text]:focus,input[type=password]:focus{{outline:none;border-color:#007aff;box-shadow:0 0 0 3px #b3d4ff}}'
+    '.show{{display:flex;align-items:center;font-weight:normal;margin:.8em 0}}'
+    '.show input{{width:22px;height:22px;margin:0 .6em 0 0}}'
+    'button{{width:100%;font-size:18px;font-weight:600;padding:14px;margin-top:1em;border:0;border-radius:8px;'
+    'background:#007aff;color:#fff}}'
+    '.hint{{font-weight:normal;color:#444;font-size:.85em}}'
+    '</style></head>'
+    '<body>'
     '<h2>Wi-Fi Setup</h2>{msg}<div style="white-space:pre-wrap;line-height:1.5">{instructions}</div>'
     '<form method="POST" action="/save">'
-    '<p><label>Network name (SSID)<br>'
-    '<input name="ssid" list="n" maxlength="32" required value="{ssid}" style="width:100%"></label>'
-    '<datalist id="n">{opts}</datalist></p>'
-    '<p><label>Password (8-63 characters, leave blank for an open network)<br>'
-    '<input name="password" id="pw" type="password" maxlength="63" style="width:100%"></label>'
-    '<label><input type="checkbox" onclick="document.getElementById(\'pw\').type=this.checked?\'text\':\'password\'"> Show password</label></p>'
+    '<label for="s">Network name (SSID)</label>'
+    '<input id="s" type="text" name="ssid" list="n" maxlength="32" required value="{ssid}" '
+    'autocapitalize="none" autocorrect="off" spellcheck="false">'
+    '<datalist id="n">{opts}</datalist>'
+    '<label for="pw">Password<br><span class="hint">8-63 characters, leave blank for an open network</span></label>'
+    '<input name="password" id="pw" type="password" maxlength="63" autocapitalize="none" autocorrect="off">'
+    '<label class="show"><input type="checkbox" onclick="document.getElementById(\'pw\').type=this.checked?\'text\':\'password\'"> Show password</label>'
     '<button type="submit">Connect</button></form>'
     '<footer style="margin-top:1.5em;color:#666;font-size:0.75em;line-height:1.5">'
     'Device MAC: {device_mac}<br>Firmware version: {firmware_version}<br>'
