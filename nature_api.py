@@ -51,7 +51,7 @@ _PORTAL_PAGE = (
     '<input name="password" id="pw" type="password" maxlength="63" autocapitalize="none" autocorrect="off">'
     '<label class="show"><input type="checkbox" onclick="document.getElementById(\'pw\').type=this.checked?\'text\':\'password\'"> Show password</label>'
     '<button type="submit">Connect</button></form>'
-    '<footer style="margin-top:1.5em;color:#666;font-size:0.75em;line-height:1.5">'
+    '<footer style="margin-top:5em;color:#666;font-size:0.75em;line-height:1.5">'
     'Device MAC: {device_mac}<br>Firmware version: {firmware_version}<br>'
     'NatureAPI version: {nature_api_version}</footer></body></html>'
 )
