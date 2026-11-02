@@ -26,7 +26,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.61"
+version = "1.0.62"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -611,8 +611,9 @@ def light_candle():
         intensity = wind_manager.get_intensity()
         brightness_level = update_night_mode_state()
         red_pwm.duty(scale_brightness(100 - min(random.uniform(95-factor, 100) * intensity, 100), brightness_level))
-        red_pwm_2.duty(scale_brightness(100 - min(random.uniform(95-factor, 100) * intensity, 100), brightness_level))
         green_pwm.duty(scale_brightness(100 - min(random.uniform(31-factor-color_temperature, 32-color_temperature) * intensity, 100), brightness_level))
+        rand_flicker_sleep()        
+        red_pwm_2.duty(scale_brightness(100 - min(random.uniform(95-factor, 100) * intensity, 100), brightness_level))
         green_pwm_2.duty(scale_brightness(100 - min(random.uniform(31-factor-color_temperature, 32-color_temperature) * intensity, 100), brightness_level))
         rand_flicker_sleep()
         time.sleep_ms(1)
