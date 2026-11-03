@@ -15,6 +15,7 @@ import secrets
 import gc
 import json
 import os
+import sys
 import network
 import ugit
 from nature_api import Client
@@ -26,7 +27,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.65d"
+version = "1.0.66"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -381,22 +382,31 @@ def save_config():
 
 def fetch_address(url):
     """GET a URL and return its parsed JSON, or None on error."""
-    try:
-        # Make GET request
-        wdt.feed()
-        response = requests.get(url, timeout=8)
-        # Get response code
-        response_code = response.status_code
-        print('Response code: ', response_code)
-        # response_content = response.content
-        # print('Response content:', response_content)
-        config_raw = response.json()
-        # Print results
-        print('Configuration: ', config_raw)
-        return config_raw
-    except Exception as e:
-        print('Error fetching settings:', e)
-        return None
+    for attempt in range(3):
+        response = None
+        try:
+            # Free fragmented heap before the large network/JSON allocations
+            gc.collect()
+            print('Free memory:', gc.mem_free())
+            wdt.feed()
+            response = requests.get(url, timeout=8)
+            print('Response code: ', response.status_code)
+            text = response.text
+            config_raw = json.loads(text)
+            print('Configuration: ', config_raw)
+            return config_raw
+        except Exception as e:
+            print('Error fetching settings (attempt %d/3):' % (attempt + 1), e)
+            sys.print_exception(e)
+        finally:
+            if response is not None:
+                try:
+                    response.close()
+                except Exception:
+                    pass
+            gc.collect()
+        time.sleep(1)
+    return None
 
     
 async def update_settings():
