@@ -26,7 +26,7 @@ from lantern_config import (
     settings_match,
 )
 
-version = "1.0.62b"
+version = "1.0.63"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -116,6 +116,7 @@ WIND_REF = 1 # wind speed that passes through unchanged; raise to boost more of 
 WIND_EXPONENT = 0.7 # 1.0 = no change, lower = more compression (small values boosted, large reduced)
 
 terminateThread = False
+candle_running = False
 
 class Pulse(PWM):
     def duty(self, percent_duty):
@@ -572,19 +573,45 @@ def update_night_mode_state():
 
     return night_mode_current
 
+_fw_deadline = 0
+
+def _feed_during_update(_t):
+    if time.ticks_diff(_fw_deadline, time.ticks_ms()) > 0:
+        wdt.feed()
+
+def _start_feeder():
+    """Start the watchdog-feeding timer; retry after GC since ENOMEM here is heap fragmentation."""
+    from machine import Timer
+    for _ in range(3):
+        try:
+            gc.collect()
+            feeder = Timer(-1)  # RP2040 only supports the virtual timer id -1
+            feeder.init(period=1000, mode=Timer.PERIODIC, callback=_feed_during_update)
+            return feeder
+        except OSError as e:
+            print("Feeder timer init failed:", e)
+            time.sleep_ms(200)
+    return None
+
 def update_firmware():
     """Pull the latest firmware from GitHub via ugit and reset on success."""
-    from machine import Timer
+    global _fw_deadline, terminateThread
     print("Starting safe firmware pull from GitHub...")
     wdt.feed()
+    # Stop the candle thread to free heap, then hold the lights at a fixed update color.
+    terminateThread = True
+    for _ in range(50):
+        if not candle_running:
+            break
+        time.sleep_ms(20)
+    red_pwm.duty(3)
+    green_pwm.duty(70)
+    red_pwm_2.duty(3)
+    green_pwm_2.duty(70)
     gc.collect()
     # ugit blocks for long stretches; feed from a timer, but stop after 3 minutes so a hung update still resets.
-    deadline = time.ticks_add(time.ticks_ms(), 180000)
-    def feed_during_update(_t):
-        if time.ticks_diff(deadline, time.ticks_ms()) > 0:
-            wdt.feed()
-    feeder = Timer(-1)  # RP2040 only supports the virtual timer id -1
-    feeder.init(period=1000, mode=Timer.PERIODIC, callback=feed_during_update)
+    _fw_deadline = time.ticks_add(time.ticks_ms(), 180000)
+    feeder = _start_feeder()
     try:
         gc.collect()
         ugit.safe_pull_all(user='faludi', repository='wind-lantern-firmware', branch=None, token=None,
@@ -594,8 +621,16 @@ def update_firmware():
         print("Safe firmware pull completed.")
     except Exception as e:
         print("Safe firmware pull failed:", e)
+        if isinstance(e, MemoryError) or (isinstance(e, OSError) and e.args and e.args[0] == 12):
+            print("Out of memory; resetting to retry update with a clean heap.")
+            time.sleep(1)
+            reset()
+        # Update failed without a reset: bring the candle back.
+        terminateThread = False
+        _thread.start_new_thread(light_candle, ())
     finally:
-        feeder.deinit()
+        if feeder:
+            feeder.deinit()
 
 def rand_flicker_sleep():
     """Sleep a random 30-100 ms between flicker updates."""
@@ -603,9 +638,10 @@ def rand_flicker_sleep():
 
 def light_candle():
     """Thread loop: drive the red/green PWM channels to simulate a wind-affected candle."""
-    global wind_manager
+    global wind_manager, candle_running
     gc.collect()
     print("Starting candle thread")
+    candle_running = True
     while terminateThread == False:
         factor = wind_manager.get_wind_factor()
         intensity = wind_manager.get_intensity()
@@ -617,6 +653,7 @@ def light_candle():
         green_pwm_2.duty(scale_brightness(100 - min(random.uniform(31-factor-color_temperature, 32-color_temperature) * intensity, 100), brightness_level))
         rand_flicker_sleep()
         time.sleep_ms(1)
+    candle_running = False
 
 wind_manager = WindManager(flicker_intensity)
 
