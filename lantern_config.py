@@ -16,54 +16,41 @@ DEFAULT_SETTINGS = {
 }
 
 
-def normalize_brightness(value):
+def _normalize_integer_range(value, minimum, maximum, fallback):
     try:
-        return min(max(float(value), 0), 100)
-    except (TypeError, ValueError):
-        return 100
+        normalized = int(value)
+        if float(value) != normalized:
+            return fallback
+        return min(max(normalized, minimum), maximum)
+    except (TypeError, ValueError, OverflowError):
+        return fallback
 
 
-def normalize_color_temperature(value):
-    try:
-        return min(max(float(value), -10), 10)
-    except (TypeError, ValueError):
-        return 0
+def normalize_brightness(value, fallback=100):
+    return _normalize_integer_range(value, 0, 100, fallback)
 
 
-def normalize_flicker_intensity(value):
+def normalize_color_temperature(value, fallback=0):
+    return _normalize_integer_range(value, -10, 10, fallback)
+
+
+def normalize_flicker_intensity(value, fallback=1):
     try:
         return min(max(float(value), 0), 5)
     except (TypeError, ValueError):
-        return 1
+        return fallback
 
 
-def normalize_settings_update_interval(value):
-    try:
-        interval = int(value)
-        if float(value) != interval:
-            return 15
-        return min(max(interval, 1), 10080)
-    except (TypeError, ValueError):
-        return 15
+def normalize_settings_update_interval(value, fallback=15):
+    return _normalize_integer_range(value, 1, 10080, fallback)
 
 
-def normalize_night_brightness(value):
-    try:
-        return min(max(float(value), 0), 100)
-    except (TypeError, ValueError):
-        return 10
+def normalize_night_brightness(value, fallback=10):
+    return _normalize_integer_range(value, 0, 100, fallback)
 
 
-def normalize_night_hour(value):
-    try:
-        hour = int(value)
-    except (TypeError, ValueError):
-        return 0
-    if hour < 0:
-        return 0
-    if hour > 23:
-        return 23
-    return hour
+def normalize_night_hour(value, fallback=0):
+    return _normalize_integer_range(value, 0, 23, fallback)
 
 
 _NORMALIZERS = {
@@ -85,7 +72,7 @@ def normalize_settings(values, fallback=None):
     for key, value in values.items():
         if key in DEFAULT_SETTINGS:
             normalizer = _NORMALIZERS.get(key)
-            settings[key] = normalizer(value) if normalizer else value
+            settings[key] = normalizer(value, settings[key]) if normalizer else value
 
     return settings
 
