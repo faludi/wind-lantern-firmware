@@ -21,13 +21,14 @@ import ugit
 from nature_api import Client
 from clock_service import LanternClock
 from lantern_hardware import LanternHardware
+from runtime_schedule import RuntimeSchedule
 from wind_manager import WindManager
 from lantern_config import DEFAULT_SETTINGS
 from settings_store import load_settings, save_settings
 from settings_state import LanternSettings
 from weather_service import fetch_current_wind, format_weather_timestamp
 
-version = "1.0.71b"
+version = "1.0.71c"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -462,52 +463,45 @@ async def main():
     lantern_clock.refresh_local_offset()
     initial_time_sync_complete = True
 
-    next_periodic_update = time.ticks_ms()
-    next_settings_update = next_periodic_update
-    next_time_sync = time.ticks_add(
-        next_periodic_update,
-        TIME_SYNC_INTERVAL_MS if initial_time_sync_succeeded else PERIODIC_UPDATE_INTERVAL_MS,
+    schedule = RuntimeSchedule(
+        time,
+        PERIODIC_UPDATE_INTERVAL_MS,
+        TIME_SYNC_INTERVAL_MS,
+        initial_time_sync_succeeded,
     )
     first_cycle_complete = False
     while True:
         wdt.feed()
         now = time.ticks_ms()
-        if time.ticks_diff(now, next_settings_update) >= 0:
+        if schedule.settings_due(now):
             await update_settings()
-            next_settings_update = time.ticks_add(
+            schedule.schedule_settings_update(
                 time.ticks_ms(), runtime_settings["settings_update_interval"] * 60 * 1000
             )
 
-        if time.ticks_diff(time.ticks_ms(), next_periodic_update) >= 0:
+        if schedule.periodic_due(time.ticks_ms()):
             if not nature_client.wifi_connected:
                 break  # exit if no connection
-            if time.ticks_diff(time.ticks_ms(), next_time_sync) >= 0:
+            if schedule.time_sync_due(time.ticks_ms()):
                 try:
                     print('Syncing time via NTP...')
                     wdt.feed()
                     if lantern_clock.sync_time():
                         print(f"DateTime: {time.gmtime()[0]}-{time.gmtime()[1]:02}-{time.gmtime()[2]:02} {time.gmtime()[3]:02}:{time.gmtime()[4]:02}:{time.gmtime()[5]:02} UTC  ")
-                        next_time_sync = time.ticks_add(
-                            time.ticks_ms(), TIME_SYNC_INTERVAL_MS
-                        )
+                        schedule.schedule_time_sync(time.ticks_ms())
                     else:
                         print("NTP sync failed; retrying in 15 minutes.")
                 except Exception as e:
                     print("Failed to update NTP; retrying in 15 minutes.", e)
             fetch_and_display_weather_data()
-            next_periodic_update = time.ticks_add(
-                time.ticks_ms(), PERIODIC_UPDATE_INTERVAL_MS
-            )
+            schedule.schedule_periodic_update(time.ticks_ms())
 
         if not first_cycle_complete:
             # Made it through one full cycle without a watchdog/crash reboot; stop backing off.
             clear_reboot_backoff()
             first_cycle_complete = True
 
-        now = time.ticks_ms()
-        settings_wait = max(time.ticks_diff(next_settings_update, now), 0)
-        periodic_wait = max(time.ticks_diff(next_periodic_update, now), 0)
-        await wait_with_watchdog(min(settings_wait, periodic_wait))
+        await wait_with_watchdog(schedule.wait_ms(time.ticks_ms()))
 
 # Create an Event Loop
 loop = asyncio.get_event_loop()
