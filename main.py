@@ -28,7 +28,7 @@ from settings_store import load_settings, save_settings
 from settings_state import LanternSettings
 from weather_service import fetch_current_wind, format_weather_timestamp
 
-version = "1.0.71c"
+version = "1.0.72"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
