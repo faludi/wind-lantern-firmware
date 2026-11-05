@@ -401,7 +401,7 @@ class Client:
         return False
     
     def get_local_timezone_offset(self):
-        """Fetch the timezone offset associated with the current public IP."""
+        """Fetch the timezone offset in seconds for the current public IP, or None if unavailable."""
         try:
             if self.watchdog: self.watchdog.feed()  # Feed the watchdog if configured
             response = requests.get(f"https://api.ipgeolocation.io/v3/timezone?apiKey={self.ipgeolocation_api_key}&ip=", headers=self.headers, timeout=10)
@@ -415,7 +415,7 @@ class Client:
                 return int(offset_str) * 60 * 60
         except Exception as e:
             print('Error fetching local timezone offset:', e)
-        return 0 # if not available, assume UTC
+        return None
 
     def set_timezone_from_location(self):
         """Look up and store the UTC offset for the configured coordinates."""

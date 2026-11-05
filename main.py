@@ -77,6 +77,7 @@ night_mode_fade_from = 100
 night_mode_fade_to = 100
 night_mode_fade_start = None
 initial_time_sync_complete = False
+cached_timezone_offset_hours = 0
 night_mode_next_update = 0
 NIGHT_MODE_UPDATE_INTERVAL_MS = 1000  # recompute night mode at most once per second
 PERIODIC_UPDATE_INTERVAL_MS = 15 * 60 * 1000  # check Wi-Fi and update weather every 15 minutes
@@ -282,6 +283,7 @@ def fetch_address(url):
     
 async def update_settings():
     """Pull remote settings, resolve address to coordinates/timezone, save, and optionally update firmware."""
+    refresh_local_timezone_offset()
     settings = fetch_address(get_settings_url())
     if settings is not None:
         remote_settings = settings.copy()
@@ -330,9 +332,17 @@ def scale_brightness(duty, brightness_override=None):
     brightness_level = min(max(brightness_override, 0), 100)
     return 100 - ((100 - duty) * brightness_level / 100)
 
+def refresh_local_timezone_offset():
+    """Look up the lantern's own UTC offset by public IP; keep the cached value if the lookup fails."""
+    global cached_timezone_offset_hours
+    offset_seconds = nature_client.get_local_timezone_offset()
+    if offset_seconds is not None:
+        cached_timezone_offset_hours = int(offset_seconds / 3600)
+        print('Local timezone offset (hours):', cached_timezone_offset_hours)
+
 def get_local_timezone_offset_hours():
-    """Return the UTC offset in hours cached by set_timezone_from_location (no network I/O)."""
-    return int(nature_client.get_remote_offset() / 3600)
+    """Return the cached lantern UTC offset in hours (no network I/O; safe for the LED thread)."""
+    return cached_timezone_offset_hours
 
 def is_night_window(local_hour, start_hour, end_hour):
     """True if local_hour falls in [start, end), supporting windows that wrap past midnight."""
@@ -496,6 +506,7 @@ async def main():
     initial_time_sync_succeeded = nature_client.sync_time()
     if not initial_time_sync_succeeded:
         print('NTP sync failed, continuing with local time if available.')
+    refresh_local_timezone_offset()
     initial_time_sync_complete = True
 
     next_periodic_update = time.ticks_ms()
