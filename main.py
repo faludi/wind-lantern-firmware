@@ -24,6 +24,7 @@ from wind_manager import WindManager
 from lantern_config import DEFAULT_SETTINGS
 from settings_store import load_settings, save_settings
 from settings_state import LanternSettings
+from weather_service import fetch_current_wind, format_weather_timestamp
 
 version = "1.0.71"
 print("Wind Lantern NatureAPI - Version:", version)
@@ -191,52 +192,16 @@ def get_settings_url():
     """Build the remote settings URL identifying this lantern and firmware version."""
     return runtime_settings["settings_endpoint"] + '?mac=' + get_lantern_mac() + '&version=' + version
 
-def parse_datetime(timestamp):
-    """Convert an ISO 'YYYY-MM-DDTHH:MM' string to 'MM/DD/YYYY HH:MM UTC'."""
-    # Split the timestamp into date and time
-    date_str, time_str = timestamp.split('T')
-    # Extract year, month, day
-    year, month, day = date_str.split('-')
-    # Extract hours and minutes
-    hour, minute = time_str.split(':')
-    # Combine into final time format
-    formatted_time = f"{month}/{day}/{year} {hour:2}:{minute:2} UTC"
-    return(formatted_time)
-
-def fetch_weather_data():
-    """Fetch current wind speed/gusts (km/h); returns a dict or None on failure."""
-    try:
-        wdt.feed()
-        forecast = nature_client.get_weather("current", "wind_speed_10m,wind_gusts_10m", forecast_days=1, expiry=300)
-        if not forecast or forecast.get('wind_speed_10m') is None:
-            return None
-        timestamp = f"{time.gmtime()[0]:04}-{time.gmtime()[1]:02}-{time.gmtime()[2]:02}T{time.gmtime()[3]:02}:{time.gmtime()[4]:02}"
-        return {
-            'current': {
-                'wind_speed_10m': forecast.get('wind_speed_10m'),
-                'wind_gusts_10m': forecast.get('wind_gusts_10m'),
-                'time': timestamp
-            }
-        }
-    except Exception as e:
-        print('Error fetching weather data:', e)
-        return None
-    
 def fetch_and_display_weather_data():
     """Fetch current weather data and display the wind conditions."""
     try:
-        # Fetch and display weather data using nature_api
-        weather = fetch_weather_data()
-        if weather is not None:
-            # print('Weather Data:', weather)
-            wind_speed = weather['current']['wind_speed_10m']*0.27778
-            wind_gusts = weather['current']['wind_gusts_10m']*0.27778
-            timestamp = weather['current']['time']
-            wind_manager.set_wind(wind_speed, wind_gusts)
-            print('Timestamp:', parse_datetime(timestamp))
-            print(f"Speed: {weather['current']['wind_speed_10m']} kph, Gusts: {weather['current']['wind_gusts_10m']} kph")
-            print(f"Speed: {wind_speed * 2.23693629:.2f} mph, Gusts: {wind_gusts * 2.23693629:.2f} mph")
-            print(f"Speed {wind_speed:.2f} m/s, Gusts {wind_gusts:.2f} m/s")
+        reading = fetch_current_wind(nature_client, wdt)
+        if reading is not None:
+            wind_manager.set_wind(reading["wind_speed_mps"], reading["wind_gusts_mps"])
+            print('Timestamp:', format_weather_timestamp(reading["timestamp"]))
+            print(f"Speed: {reading['wind_speed_kph']} kph, Gusts: {reading['wind_gusts_kph']} kph")
+            print(f"Speed: {reading['wind_speed_mps'] * 2.23693629:.2f} mph, Gusts: {reading['wind_gusts_mps'] * 2.23693629:.2f} mph")
+            print(f"Speed {reading['wind_speed_mps']:.2f} m/s, Gusts {reading['wind_gusts_mps']:.2f} m/s")
             print("Wind factor:", wind_manager.wind_factor, "Gust factor:", wind_manager.gust_factor)
         else:
             print('No weather data available')
