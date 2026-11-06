@@ -61,8 +61,10 @@ class LanternHardware:
         self.set_primary_duties(red, green)
         self.set_secondary_duties(red_2, green_2)
 
-    def set_status_color(self, red, green):
+    def set_status_color(self, red, green, blue=0):
         self.set_candle_duties(100 - red, 100 - green, 100 - red, 100 - green)
+        self.blue.value(0 if blue else 1)
+        self.blue_2.value(0 if blue else 1)
 
     def setup_button_pressed(self):
         """Return whether the active-low setup button is held, after debounce."""
