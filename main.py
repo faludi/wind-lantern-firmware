@@ -415,12 +415,12 @@ def light_candle():
         brightness_level = update_night_mode_state()
         hardware.set_primary_duties(
             scale_brightness(100 - min(random.uniform(95-factor, 100) * intensity, 100), brightness_level),
-            scale_brightness(100 - min(random.uniform(61-factor-runtime_settings["color_temperature"], 62-runtime_settings["color_temperature"]) * intensity, 100), brightness_level),
+            scale_brightness(100 - min(random.uniform(71-factor-runtime_settings["color_temperature"], 72-runtime_settings["color_temperature"]) * intensity, 100), brightness_level),
         )
         rand_flicker_sleep()        
         hardware.set_secondary_duties(
             scale_brightness(100 - min(random.uniform(95-factor, 100) * intensity, 100), brightness_level),
-            scale_brightness(100 - min(random.uniform(61-factor-runtime_settings["color_temperature"], 62-runtime_settings["color_temperature"]) * intensity, 100), brightness_level),
+            scale_brightness(100 - min(random.uniform(71-factor-runtime_settings["color_temperature"], 72-runtime_settings["color_temperature"]) * intensity, 100), brightness_level),
         )
         rand_flicker_sleep()
         time.sleep_ms(1)
