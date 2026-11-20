@@ -1,0 +1,13 @@
+{
+    "address": "1 Market St, San Francisco, CA",
+    "latitude": 37.7946,
+    "longitude": -122.3942,
+    "settings_endpoint": "https://shinyshape.com/windlantern/lantern_checkin.php",
+    "settings_update_interval": 15,
+    "lantern_brightness": 100,
+    "night_brightness": 10,
+    "night_start": 22,
+    "night_end": 8,
+    "color_temperature": 0,
+    "flicker_intensity": 1.0
+}

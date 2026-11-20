@@ -8,7 +8,7 @@ DEFAULT_SETTINGS = {
     "settings_endpoint": "https://shinyshape.com/windlantern/lantern_checkin.php",
     "settings_update_interval": 15,
     "lantern_brightness": 100,
-    "night_brightness": 20,
+    "night_brightness": 10,
     "night_start": 22,
     "night_end": 8,
     "color_temperature": 0,
