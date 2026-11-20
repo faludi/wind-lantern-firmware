@@ -31,7 +31,7 @@ def normalize_brightness(value, fallback=100):
 
 
 def normalize_color_temperature(value, fallback=0):
-    return _normalize_integer_range(value, -10, 10, fallback)
+    return _normalize_integer_range(value, -20, 20, fallback)
 
 
 def normalize_flicker_intensity(value, fallback=1):
