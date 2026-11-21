@@ -28,7 +28,7 @@ from settings_store import load_settings, save_settings
 from settings_state import LanternSettings
 from weather_service import fetch_current_wind, format_weather_timestamp
 
-version = "1.0.75"
+version = "1.0.76"
 print("Wind Lantern NatureAPI - Version:", version)
 
 time.sleep(2) # allow usb connection on startup
@@ -332,7 +332,7 @@ def update_night_mode_state():
 
     if night_mode_fade_start is not None:
         elapsed = time.ticks_diff(now, night_mode_fade_start)
-        if elapsed >= 10000:
+        if elapsed >= 15000:
             night_mode_current = night_mode_fade_to
             night_mode_fade_start = None
         else:
